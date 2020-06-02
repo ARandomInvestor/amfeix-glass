@@ -74,12 +74,12 @@ let allWithdrawals = [];
 
 let bitcoinMapping = {};
 let ethereumMapping = {};
+let knownSystemAddresses = [
+    "33ns4GGpz7vVAfoXDpJttwd7XkwtnvtTjw"
+];
 
 
 function pad(n){return n<10 ? '0'+n : n}
-
-
-
 
 //done like this cause it's too much load for local node
 
@@ -110,11 +110,35 @@ infuraContract.getInvestors().then(async (investors) => {
                         let newTx = data.transactions[txid];
                         if(!oldTx.hasOwnProperty("related") || oldTx.exit_timestamp !== newTx.exit_timestamp){
                             needsFullUpdate = true;
+                        }else if(oldTx.hasOwnProperty("related")){
+                            for(let j in oldTx.related){
+                                let r = oldTx.related[j];
+                                if(r.track_type === "withdrawal"){
+                                    for (let x in r.vin) {
+                                        if(r.vin[x].prevOut.addresses[0] === account.getBitcoinAddress()){
+                                            needsFullUpdate = true;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
             console.log((needsFullUpdate ? "full " : "==== small ") + account.getPublicKey());
+
+            let addToSystemAddresses = (related) => {
+                for(let j in related){
+                    let r = related[j];
+                    if(r.track_type === "withdrawal"){
+                        for (let x in r.vin) {
+                            if(r.vin[x].prevOut.addresses[0] !== account.getBitcoinAddress() && !knownSystemAddresses.includes(r.vin[x].prevOut.addresses[0])){
+                                knownSystemAddresses.push(r.vin[x].prevOut.addresses[0])
+                            }
+                        }
+                    }
+                }
+            }
 
             if(needsFullUpdate){
                 let matchingTransactions = await account.getBitcoinMatchingTransactions(data);
@@ -131,11 +155,13 @@ infuraContract.getInvestors().then(async (investors) => {
                 for (let txid in data.transactions) {
                     let tx = data.transactions[txid];
                     tx.related = getRelatedTx(tx.txid);
+                    addToSystemAddresses(tx.related)
                 }
             }else{
                 for (let txid in data.transactions) {
                     let tx = data.transactions[txid];
                     tx.related = oldAccount.transactions[txid].related;
+                    addToSystemAddresses(tx.related)
                 }
             }
 
@@ -246,7 +272,7 @@ infuraContract.getInvestors().then(async (investors) => {
                 rd: formatDate(date),
                 btc: account.getBitcoinAddress(),
                 eth: account.getEthereumAddress().toLowerCase(),
-                tx: (tx.signature === "referer" ? "REFERRER" : tx.txid),
+                tx: knownSystemAddresses.includes(account.getBitcoinAddress()) ? "SYSTEM TX" : (tx.signature === "referer" ? "REFERRER" : tx.txid),
                 v: tx.balance.toFixed(8),
                 pd: paidOut,
                 ptx: relatedTx,
@@ -290,6 +316,8 @@ infuraContract.getInvestors().then(async (investors) => {
         fs.writeFile(path.resolve("index", "ethereumMapping.json"), JSON.stringify(ethereumMapping, null, " "), () => {
         });
         fs.writeFile(path.resolve("index", "pendingWithdrawals.json"), JSON.stringify(pendingWithdrawals, null, " "), () => {
+        });
+        fs.writeFile(path.resolve("index", "knownSystemAddresses.json"), JSON.stringify(knownSystemAddresses, null, " "), () => {
         });
     }
 

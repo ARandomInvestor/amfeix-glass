@@ -301,6 +301,13 @@ export default class InvestorAccount{
                              }
                          }
 
+                         for (let x in tx.vin) {
+                             if(tx.vin[x].prevOut.addresses[0] === this.btc_address){
+                                 values = [];
+                                 break;
+                             }
+                         }
+
 
                          for(let j in transactions){
                              let btx = transactions[j];
