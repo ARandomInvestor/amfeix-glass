@@ -2,9 +2,13 @@
 Includes JavaScript libraries to interact with AMFEIX contract and gather other details from on-chain.
 Results are live on https://amfeix-glassdoor.info/
 
-See config.example.js for external dependencies needed, create config.js with filled setup.
+WARNING: This is a collection of libraries written beforehand, with more modifications on top added hastily to cover current conditions. It is a work in progress, as you can probably see.
 
-Execute with node index.js.
+See config.example.js for external dependencies needed (Bitcoin full node with -txindex=1, Electrum full index server, and Ethereum full node / Infura), create config.js with filled setup.
+
+You need a modern Node.JS
+
+Install dependencies first with `npm install`
 
 Setup index folders. These are used to keep state across multiple runs:
 ```
@@ -15,3 +19,13 @@ mkdir -p index/contract_tx/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
 mkdir -p index/tx/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
 mkdir -p index/contract/{d,f,k}
 ```
+
+Execute with `node index.js`.
+
+Point a webserver to `web/`
+
+
+### Tips
+Feel like tipping? Why though, this could have been made by anyone.
+
+If you still feel like it: `3KPEV9dAS7fHEAigkW9TQdNQKPko6cGrbY`
