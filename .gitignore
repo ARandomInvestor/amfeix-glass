@@ -1,0 +1,7 @@
+index/
+.idea/
+node_modules/
+*.csv
+package-lock.json
+config.js
+web/*.json
