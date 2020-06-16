@@ -4,8 +4,6 @@ import Config from "./config.js"
 
 import {CacheProvider, StorageContract, FullNodeBitcoinProvider, BlockchainComBitcoinProvider, InvestorAccount, BitcoinUnitConverter} from "amfeix-api";
 
-console.log()
-
 import Web3 from "web3"
 import Web3HttpProvider from "web3-providers-http"
 import Client from "bitcoin-core";
@@ -22,7 +20,7 @@ let cache = new CacheProvider("./");
 
 function getAccountFile(k){
     try{
-        let result = fs.readFileSync("./", path.resolve("index", "accounts", k[2].toLowerCase(), k + ".json"))
+        let result = fs.readFileSync(path.resolve("./", "index", "accounts", k[2].toLowerCase(), k + ".json"))
         return JSON.parse(result);
     }catch (e) {
         return null;
