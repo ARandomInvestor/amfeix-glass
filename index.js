@@ -75,6 +75,8 @@ let totalWithdrawnReferrers = new BigNumber(0);
 let totalCurrentBalance = new BigNumber(0);
 let totalCurrentReferrers = new BigNumber(0);
 
+let totalWithdrawPending = new BigNumber(0);
+
 let pendingWithdrawals = [];
 let allWithdrawals = [];
 
@@ -187,6 +189,7 @@ contract.getInvestors().then(async (investors) => {
                 let tx = data.transactions[txid];
                 if (tx.exit_timestamp === null && tx.hasOwnProperty("requested_exit")) {
                     pendingWithdrawals.push(tx);
+                    totalWithdrawPending = totalWithdrawPending.plus(tx.balance);
                 }
 
                 if (tx.hasOwnProperty("requested_exit")) {
@@ -237,6 +240,7 @@ contract.getInvestors().then(async (investors) => {
     console.log("Total deposited: " + BitcoinUnitConverter.from_Satoshi(totalDeposit).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     console.log("Total withdrawn (deposits): " + BitcoinUnitConverter.from_Satoshi(totalWithdrawn).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     console.log("Total withdrawn (referrals): " + BitcoinUnitConverter.from_Satoshi(totalWithdrawnReferrers).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
+    console.log("Total to be withdrawn (pending): " + BitcoinUnitConverter.from_Satoshi(totalWithdrawPending).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     console.log("Total balance (deposits): " + BitcoinUnitConverter.from_Satoshi(totalCurrentBalance).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     console.log("Total balance (referrals): " + BitcoinUnitConverter.from_Satoshi(totalCurrentReferrers).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     //ALL DONE
