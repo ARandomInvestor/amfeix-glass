@@ -1,21 +1,28 @@
 'use strict';
 
 import Config from "./config.js"
-import StorageContract from "./src/amfeix/StorageContract.js"
-import BitcoinProvider from "./src/amfeix/bitcoin/BitcoinProvider.js"
+
+import {CacheProvider, StorageContract, FullNodeBitcoinProvider, BlockchainComBitcoinProvider, InvestorAccount, BitcoinUnitConverter} from "amfeix-api";
+
+console.log()
+
 import Web3 from "web3"
 import Web3HttpProvider from "web3-providers-http"
 import Client from "bitcoin-core";
-import InvestorAccount from "./src/amfeix/InvestorAccount.js";
 import process from "process"
 import bitcoin from "bitcoinjs-lib";
 import fs from "fs"
 import path from "path";
+import BigNumber from "bignumber.js";
 
+import async from "async"
+
+
+let cache = new CacheProvider("./");
 
 function getAccountFile(k){
     try{
-        let result = fs.readFileSync(path.resolve("index", "accounts", k[2].toLowerCase(), k + ".json"))
+        let result = fs.readFileSync("./", path.resolve("index", "accounts", k[2].toLowerCase(), k + ".json"))
         return JSON.parse(result);
     }catch (e) {
         return null;
@@ -23,7 +30,7 @@ function getAccountFile(k){
 }
 
 function setAccountFile(k, v){
-    fs.writeFile(path.resolve("index", "accounts", k[2].toLowerCase(), k + ".json"), JSON.stringify(v, null, " "), () => {});
+    fs.writeFile(path.resolve("./", "index", "accounts", k[2].toLowerCase(), k + ".json"), JSON.stringify(v, null, " "), () => {});
 }
 
 let provider = new Web3HttpProvider(Config.ethereum.url, {
@@ -32,67 +39,76 @@ let provider = new Web3HttpProvider(Config.ethereum.url, {
 })
 
 let web3 = new Web3(provider);
-let infuraWeb = new Web3(Config.ethereum.infuraUrl ? Config.ethereum.infuraUrl : Config.ethereum.url);
 
-let client = new Client({
-    host: Config.bitcoind.host,
-    port: Config.bitcoind.port,
-    ssl: {
-        enabled: Config.bitcoind.ssl,
-        strict: false
-    },
-    agentOptions: {
+let btc = null;
+if(Config.bitcoin.provider.toLowerCase() === "fullnode"){
+    let client = new Client({
+        host: Config.bitcoin.bitcoind.host,
+        port: Config.bitcoin.bitcoind.port,
+        ssl: {
+            enabled: Config.bitcoin.bitcoind.ssl,
+            strict: false
+        },
+        agentOptions: {
 
-    },
-    username: "bitcoin",
-    password: "bitcoin",
-    network: "mainnet"
-});
+        },
+        username: "bitcoin",
+        password: "bitcoin",
+        network: "mainnet"
+    });
 
-let btc = new BitcoinProvider(client, {
-    host: Config.electrum.host,
-    port: Config.electrum.port,
-    ssl: Config.electrum.ssl
-});
+    btc = new FullNodeBitcoinProvider(cache, client, {
+        host: Config.bitcoin.electrum.host,
+        port: Config.bitcoin.electrum.port,
+        ssl: Config.bitcoin.electrum.ssl
+    });
+}else if (Config.bitcoin.provider.toLowerCase() === "blockchain.com"){
+    btc = new BlockchainComBitcoinProvider(cache);
+}else{
+    throw new Error("Unknown config bitcoin.provider " + Config.bitcoin.provider);
+}
 
-let contract = new StorageContract(web3, btc);
-let infuraContract = new StorageContract(infuraWeb, btc);
+let contract = new StorageContract(web3, cache, btc);
 
+let totalDeposit = new BigNumber(0);
+let totalWithdrawn = new BigNumber(0);
+let totalWithdrawnReferrers = new BigNumber(0);
 
-
-let totalDeposit = 0;
-let totalWithdrawn = 0;
-let totalWithdrawnReferrers = 0;
-
-let totalCurrentBalance = 0;
-let totalCurrentReferrers = 0;
-
-let totalFees = 0;
+let totalCurrentBalance = new BigNumber(0);
+let totalCurrentReferrers = new BigNumber(0);
 
 let pendingWithdrawals = [];
 let allWithdrawals = [];
 
 let bitcoinMapping = {};
 let ethereumMapping = {};
-let knownSystemAddresses = [
-    "33ns4GGpz7vVAfoXDpJttwd7XkwtnvtTjw"
-];
+let knownSystemAddresses = {};
 
 
 function pad(n){return n<10 ? '0'+n : n}
 
-//done like this cause it's too much load for local node
+contract.getInvestors().then(async (investors) => {
 
-infuraContract.getInvestors().then(async (investors) => {
+    let fundAddresses = await contract.getDepositAddresses();
+    for(let i in fundAddresses){
+        knownSystemAddresses[fundAddresses[i]] = 1;
+    }
+
     let processed = [];
     let startTime = new Date();
 
-    for (let i in investors) {
+    let maxInProcess = 16;
+    let totalLength = investors.length;
+
+    let queue = async.queue(async (task) => {
         try {
-            let account = await InvestorAccount.fromEthereumAddress(investors[i], contract);
+            let account = await InvestorAccount.fromEthereumAddress(task, contract);
             if (bitcoinMapping.hasOwnProperty(account.getBitcoinAddress())) {
-                continue;
+                totalLength--;
+                return;
             }
+
+            //console.log("Starting " + task.toLowerCase())
 
             bitcoinMapping[account.getBitcoinAddress()] = account.getPublicKey();
             ethereumMapping[account.getEthereumAddress().toLowerCase()] = account.getPublicKey();
@@ -114,8 +130,8 @@ infuraContract.getInvestors().then(async (investors) => {
                             for(let j in oldTx.related){
                                 let r = oldTx.related[j];
                                 if(r.track_type === "withdrawal"){
-                                    for (let x in r.vin) {
-                                        if(r.vin[x].prevOut.addresses[0] === account.getBitcoinAddress()){
+                                    for (let x in r.ins) {
+                                        if(btc.getAddressForInput(r.ins[x]) === account.getBitcoinAddress()){
                                             needsFullUpdate = true;
                                         }
                                     }
@@ -125,15 +141,19 @@ infuraContract.getInvestors().then(async (investors) => {
                     }
                 }
             }
-            console.log((needsFullUpdate ? "full " : "==== small ") + account.getPublicKey());
 
             let addToSystemAddresses = (related) => {
                 for(let j in related){
                     let r = related[j];
                     if(r.track_type === "withdrawal"){
-                        for (let x in r.vin) {
-                            if(r.vin[x].prevOut.addresses[0] !== account.getBitcoinAddress() && !knownSystemAddresses.includes(r.vin[x].prevOut.addresses[0])){
-                                knownSystemAddresses.push(r.vin[x].prevOut.addresses[0])
+                        for (let x in r.ins) {
+                            let addr = btc.getAddressForInput(r.ins[x]);
+                            if(addr !== account.getBitcoinAddress()){
+                                if(!(addr in knownSystemAddresses)){
+                                    knownSystemAddresses[addr] = 0;
+                                }
+
+                                knownSystemAddresses[addr]++;
                             }
                         }
                     }
@@ -177,44 +197,50 @@ infuraContract.getInvestors().then(async (investors) => {
 
                 if (tx.exit_timestamp === null) {
                     if (tx.signature === "referer") {
-                        totalCurrentReferrers += tx.balance;
+                        totalCurrentReferrers = totalCurrentReferrers.plus(tx.balance);
                     } else {
-                        totalCurrentBalance += tx.balance;
+                        totalCurrentBalance = totalCurrentBalance.plus(tx.balance);
                     }
                 } else {
                     if (tx.signature === "referer") {
-                        totalWithdrawnReferrers += tx.balance;
+                        totalWithdrawnReferrers = totalWithdrawnReferrers.plus(tx.balance);
                     } else {
-                        totalWithdrawn += tx.balance;
+                        totalWithdrawn = totalWithdrawn.plus(tx.balance);
                     }
                 }
 
-                totalDeposit += tx.value;
-                totalFees += tx.fee;
+                totalDeposit = totalDeposit.plus(tx.value);
             }
 
-            if (isNaN(totalDeposit)) {
-                console.log(data);
+            if (totalDeposit.isNaN()) {
+                console.log("NaN deposit", data);
                 process.exit(1)
-                continue;
+                return;
             }
 
             setAccountFile(account.getPublicKey(), data);
 
             processed.push(account.getEthereumAddress());
 
-            console.log("Processed " + investors[i] + " [" + processed.length + "/" + investors.length + "]")
+            console.log("Processed " + task.toLowerCase() + " [" + (processed.length) + "/" + totalLength + "]")
         } catch (e) {
             console.log(e)
         }
+
+    }, maxInProcess);
+
+    for(let i in investors){
+        queue.push(investors[i]);
     }
 
-    console.log("Total deposited: " + totalDeposit);
-    console.log("Total withdrawn (deposits): " + totalWithdrawn);
-    console.log("Total withdrawn (referrals): " + totalWithdrawnReferrers);
-    console.log("Total balance (deposits): " + totalCurrentBalance);
-    console.log("Total balance (referrals): " + totalCurrentReferrers);
-    console.log("Total fees: " + totalFees);
+    await queue.drain();
+
+
+    console.log("Total deposited: " + BitcoinUnitConverter.from_Satoshi(totalDeposit).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
+    console.log("Total withdrawn (deposits): " + BitcoinUnitConverter.from_Satoshi(totalWithdrawn).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
+    console.log("Total withdrawn (referrals): " + BitcoinUnitConverter.from_Satoshi(totalWithdrawnReferrers).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
+    console.log("Total balance (deposits): " + BitcoinUnitConverter.from_Satoshi(totalCurrentBalance).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
+    console.log("Total balance (referrals): " + BitcoinUnitConverter.from_Satoshi(totalCurrentReferrers).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces()));
     //ALL DONE
 
 
@@ -238,6 +264,7 @@ infuraContract.getInvestors().then(async (investors) => {
         let processedEntries = [];
 
         let csv = "";
+        let wCsv = "";
 
         csv += ("request date, btc address, eth address, transaction, value, paid out date, paid out transaction, delay (as of " + formatDate(startTime) + ")\r\n");
 
@@ -268,12 +295,13 @@ infuraContract.getInvestors().then(async (investors) => {
             }
             delay = Math.ceil((delay / 1000) / 3600);
             delay = Math.floor(delay / 24) + " day(s) " + pad(delay % 24) + " hours";
+            let balance = BitcoinUnitConverter.from_Satoshi(tx.balance).to_BTC().toFormat(BitcoinUnitConverter.getDecimalPlaces());
             let entry = {
                 rd: formatDate(date),
                 btc: account.getBitcoinAddress(),
                 eth: account.getEthereumAddress().toLowerCase(),
-                tx: knownSystemAddresses.includes(account.getBitcoinAddress()) ? "SYSTEM TX" : (tx.signature === "referer" ? "REFERRER" : tx.txid),
-                v: tx.balance.toFixed(8),
+                tx: account.getBitcoinAddress() in knownSystemAddresses ? "SYSTEM TX" : (tx.signature === "referer" ? "REFERRER" : tx.txid),
+                v: balance,
                 pd: paidOut,
                 ptx: relatedTx,
                 d: delay
@@ -287,9 +315,10 @@ infuraContract.getInvestors().then(async (investors) => {
                 processedEntries.push(entry2);
             } else {
                 pendingEntries.push(entry);
+                wCsv += (account.getBitcoinAddress() + ", " + balance + "\r\n");
             }
 
-            csv += (formatDate(date) + ", " + account.getBitcoinAddress() + ", " + account.getEthereumAddress().toLowerCase() + ", " + (tx.signature === "referer" ? "REFERRER" : tx.txid) + ", " + tx.balance.toFixed(8) + ", " + paidOut + ", " + relatedTx + ", " + delay + "\r\n");
+            csv += (formatDate(date) + ", " + account.getBitcoinAddress() + ", " + account.getEthereumAddress().toLowerCase() + ", " + (tx.signature === "referer" ? "REFERRER" : tx.txid) + ", " + balance + ", " + paidOut + ", " + relatedTx + ", " + delay + "\r\n");
         }
 
         processedEntries.sort((a, b) => {
@@ -300,6 +329,13 @@ infuraContract.getInvestors().then(async (investors) => {
             delete processedEntries[i].exit_timestamp;
         }
 
+        const knownSystemAddressesOrdered = {};
+        Object.keys(knownSystemAddresses).sort((a, b) => {
+            return b - a;
+        }).forEach(function(key) {
+            knownSystemAddressesOrdered[key] = knownSystemAddresses[key];
+        });
+
 
         fs.writeFile(path.resolve("web", "withdrawEntries.json"), JSON.stringify(withdrawEntries), () => {
         });
@@ -309,6 +345,8 @@ infuraContract.getInvestors().then(async (investors) => {
         });
         fs.writeFile(path.resolve("web", "latest.csv"), csv, () => {
         });
+        fs.writeFile(path.resolve("web", "many.txt"), wCsv, () => {
+        });
 
 
         fs.writeFile(path.resolve("index", "bitcoinMapping.json"), JSON.stringify(bitcoinMapping, null, " "), () => {
@@ -317,9 +355,8 @@ infuraContract.getInvestors().then(async (investors) => {
         });
         fs.writeFile(path.resolve("index", "pendingWithdrawals.json"), JSON.stringify(pendingWithdrawals, null, " "), () => {
         });
-        fs.writeFile(path.resolve("index", "knownSystemAddresses.json"), JSON.stringify(knownSystemAddresses, null, " "), () => {
+        fs.writeFile(path.resolve("index", "knownSystemAddresses.json"), JSON.stringify(knownSystemAddressesOrdered, null, " "), () => {
         });
     }
 
 });
-

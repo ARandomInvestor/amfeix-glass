@@ -1,24 +1,25 @@
 {
   "name": "amfeix-glass",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
   "type": "module",
+  "keywords": [],
+  "author": "ARandomInvestor",
+  "license": "MIT",
+  "homepage": "https://amfeix-glassdoor.info/",
   "dependencies": {
     "async": "^3.2.0",
-    "bitcoin-core": "^3.0.0",
+    "bignumber.js": "^9.0.0",
     "bitcoinjs-lib": "^5.1.7",
-    "bs58check": "^2.1.2",
-    "electrum-client": "0.0.6",
-    "ethereumjs-tx": "^2.1.2",
-    "ethereumjs-wallet": "^0.6.3",
     "https": "^1.0.0",
-    "web3": "^1.2.6"
+    "web3": "^1.2.6",
+    "amfeix-api": "git+https://git@github.com/ARandomInvestor/amfeix-api.git#1b9c30d6d40d16b5f6d0a6401f106358272f0456"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ARandomInvestor/amfeix-glass.git"
   }
 }

@@ -4,23 +4,15 @@ Results are live on https://amfeix-glassdoor.info/
 
 WARNING: This is a collection of libraries written beforehand, with more modifications on top added hastily to cover current conditions. It is a work in progress, as you can probably see.
 
-See config.example.js for external dependencies needed (Bitcoin full node with -txindex=1, Electrum full index server, and Ethereum full node / Infura), create config.js with filled setup.
+See config.example.*.js for external dependencies needed (Blockchain.com, Bitcoin full node with -txindex=1, Electrum full index server, and Ethereum full node / Infura), create config.js with filled setup.
 
 You need a modern Node.JS
 
 Install dependencies first with `npm install`
 
-Setup index folders. These are used to keep state across multiple runs:
-```
-mkdir -p index/{accounts,contract,contract_rtx,contract_tx,tx}
-mkdir -p index/accounts/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
-mkdir -p index/contract_rtx/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
-mkdir -p index/contract_tx/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
-mkdir -p index/tx/{0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f}
-mkdir -p index/contract/{d,f,k}
-```
+Index folders are used to keep cached state across multiple runs:
 
-Execute with `node index.js`.
+Execute with `npm run start`.
 
 Point a webserver to `web/`
 

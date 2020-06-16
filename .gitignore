@@ -1,7 +1,8 @@
-index/
+index/**/*.json
 .idea/
 node_modules/
 *.csv
+web/*.txt
 package-lock.json
 config.js
 web/*.json
