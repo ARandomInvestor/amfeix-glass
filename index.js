@@ -97,7 +97,7 @@ contract.getInvestors().then(async (investors) => {
     let processed = [];
     let startTime = new Date();
 
-    let maxInProcess = 16;
+    let maxInProcess = 64;
     let totalLength = investors.length;
 
     let queue = async.queue(async (task) => {

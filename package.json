@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "description": "",
   "scripts": {
-    "start": "node index.js"
+    "start": "node --experimental-modules index.js"
   },
   "type": "module",
   "keywords": [],
@@ -16,7 +16,7 @@
     "bitcoinjs-lib": "^5.1.7",
     "https": "^1.0.0",
     "web3": "^1.2.6",
-    "amfeix-api": "git+https://git@github.com/ARandomInvestor/amfeix-api.git#ac061a37978495f652de2a045c53cdd21ad24714"
+    "amfeix-api": "git+https://git@github.com/ARandomInvestor/amfeix-api.git#2e0921c7325261fbd69c576e9714c39040306282"
   },
   "repository": {
     "type": "git",
