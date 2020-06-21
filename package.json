@@ -16,7 +16,7 @@
     "bitcoinjs-lib": "^5.1.7",
     "https": "^1.0.0",
     "web3": "^1.2.6",
-    "amfeix-api": "git+https://git@github.com/ARandomInvestor/amfeix-api.git#2e0921c7325261fbd69c576e9714c39040306282"
+    "amfeix-api": "git+https://git@github.com/ARandomInvestor/amfeix-api.git#2dd0e80396ea7e0f8f9bb41c810454b2d6b7c39f"
   },
   "repository": {
     "type": "git",
