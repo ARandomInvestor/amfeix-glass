@@ -284,7 +284,7 @@ contract.getInvestors().then(async (investors) => {
                 if(tx.related !== null && tx.related.length > 0){
                     for(let j in tx.related){
                         if(tx.related[j].track_type === "withdrawal"){
-                            relatedTx = tx.related[j].track_txid;
+                            relatedTx = tx.related[j].track_txid[0];
                             break;
                         }
                     }
