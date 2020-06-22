@@ -88,7 +88,6 @@ let knownSystemAddresses = {};
 function pad(n){return n<10 ? '0'+n : n}
 
 contract.getInvestors().then(async (investors) => {
-
     let fundAddresses = await contract.getDepositAddresses();
     for(let i in fundAddresses){
         knownSystemAddresses[fundAddresses[i]] = 1;
@@ -126,17 +125,6 @@ contract.getInvestors().then(async (investors) => {
                         let newTx = data.transactions[txid];
                         if(!oldTx.hasOwnProperty("related") || oldTx.exit_timestamp !== newTx.exit_timestamp){
                             needsFullUpdate = true;
-                        }else if(oldTx.hasOwnProperty("related")){
-                            for(let j in oldTx.related){
-                                let r = oldTx.related[j];
-                                if(r.track_type === "withdrawal"){
-                                    for (let x in r.ins) {
-                                        if(btc.getAddressForInput(r.ins[x]) === account.getBitcoinAddress()){
-                                            needsFullUpdate = true;
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -284,7 +272,7 @@ contract.getInvestors().then(async (investors) => {
                 if(tx.related !== null && tx.related.length > 0){
                     for(let j in tx.related){
                         if(tx.related[j].track_type === "withdrawal"){
-                            relatedTx = tx.related[j].track_txid[0];
+                            relatedTx = tx.related[j].txid;
                             break;
                         }
                     }
